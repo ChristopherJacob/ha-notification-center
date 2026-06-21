@@ -29,6 +29,10 @@ export class NotificationCenterPanel extends LitElement {
   @state() private _groupDialogOpen = false;
   @state() private _editingGroup: NotificationGroup | null = null;
 
+  // Drag state
+  @state() private _dragIdx: number | null = null;
+  @state() private _dropIdx: number | null = null;
+
   @query("rule-editor-dialog") _ruleDialog!: RuleEditorDialog;
   @query("group-editor-dialog") _groupDialog!: GroupEditorDialog;
 
@@ -257,13 +261,26 @@ export class NotificationCenterPanel extends LitElement {
         <h1>Notification Rules</h1>
         <button class="nc-btn primary" @click=${()=>this._openRuleEditor()}>+ New Rule</button>
       </div>
-      <div style="color:var(--nc-text-secondary);font-size:13px;margin-bottom:16px;">First match wins — rules are evaluated in order</div>
+      <div style="color:var(--nc-text-secondary);font-size:13px;margin-bottom:16px;">
+        First match wins — drag to reorder
+      </div>
       ${!this._rules.length?html`<div class="nc-empty-state"><ha-icon icon="mdi:routes"></ha-icon><h3>No rules</h3></div>`:
-        html`<div style="display:flex;flex-direction:column;gap:8px;">
+        html`<div style="display:flex;flex-direction:column;gap:4px;">
           ${this._rules.map((rule,idx)=>html`
-            <div class="nc-card" style="cursor:pointer;" @click=${()=>this._openRuleEditor(rule)}>
+            <div
+              class="nc-card"
+              style="cursor:grab;transition:all 0.15s;opacity:${this._dragIdx===idx?'0.4':'1'};border-left:${this._dropIdx===idx?'3px solid var(--nc-primary)':'3px solid transparent'};${this._dropIdx===idx?'margin-top:8px;':''}"
+              draggable="true"
+              @dragstart=${(e:DragEvent)=>this._onDragStart(e,idx)}
+              @dragover=${(e:DragEvent)=>this._onDragOver(e,idx)}
+              @dragleave=${()=>this._onDragLeave(idx)}
+              @drop=${(e:DragEvent)=>this._onDrop(e,idx)}
+              @dragend=${()=>this._onDragEnd()}
+              @click=${()=>this._openRuleEditor(rule)}
+            >
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="cursor:grab;color:var(--nc-text-secondary);font-size:18px;user-select:none;" @click=${(e:Event)=>e.stopPropagation()}>⋮⋮</span>
                   <span style="color:var(--nc-text-secondary);font-size:13px;font-weight:600;min-width:24px;">#${idx+1}</span>
                   <div>
                     <div style="font-weight:500;">${rule.name}</div>
@@ -273,12 +290,49 @@ export class NotificationCenterPanel extends LitElement {
                 <div style="display:flex;align-items:center;gap:8px;">
                   ${rule.enabled?html`<span style="color:#4caf50;font-size:12px;">Enabled</span>`:html`<span style="color:var(--nc-text-secondary);font-size:12px;">Disabled</span>`}
                   <span style="color:var(--nc-text-secondary);font-size:12px;">→ ${rule.target_group}</span>
-                  ${rule.conditions.length>0?html`<span style="color:var(--nc-text-secondary);font-size:11px;">${rule.conditions.length} condition(s)</span>`:html`<span style="color:var(--nc-text-secondary);font-size:11px;font-style:italic;">Always</span>`}
+                  ${rule.conditions.length>0?html`<span style="color:var(--nc-text-secondary);font-size:11px;">${rule.conditions.length} cond</span>`:html`<span style="color:var(--nc-text-secondary);font-size:11px;font-style:italic;">Always</span>`}
                 </div>
               </div>
             </div>`)}
+          <div style="height:4px;border-radius:2px;background:${this._dropIdx===this._rules.length?'var(--nc-primary)':'transparent'};transition:all 0.15s;margin-top:4px;"></div>
         </div>`}
     `;
+  }
+
+  // ── Drag & Drop ─────────────────────────────────
+
+  private _onDragStart(e: DragEvent, idx: number) {
+    this._dragIdx = idx;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(idx));
+    }
+  }
+
+  private _onDragOver(e: DragEvent, idx: number) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    this._dropIdx = idx;
+  }
+
+  private _onDragLeave(idx: number) {
+    if (this._dropIdx === idx) this._dropIdx = null;
+  }
+
+  private async _onDrop(e: DragEvent, idx: number) {
+    e.preventDefault();
+    const fromIdx = this._dragIdx;
+    this._dragIdx = null;
+    this._dropIdx = null;
+
+    if (fromIdx === null || fromIdx === idx) return;
+
+    await this._handleRuleReorder(fromIdx, idx);
+  }
+
+  private _onDragEnd() {
+    this._dragIdx = null;
+    this._dropIdx = null;
   }
 
   private _renderGroups() {

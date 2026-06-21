@@ -15,6 +15,8 @@ export declare class NotificationCenterPanel extends LitElement {
     private _editingRule;
     private _groupDialogOpen;
     private _editingGroup;
+    private _dragIdx;
+    private _dropIdx;
     _ruleDialog: RuleEditorDialog;
     _groupDialog: GroupEditorDialog;
     static styles: import("lit").CSSResult[];
@@ -33,6 +35,11 @@ export declare class NotificationCenterPanel extends LitElement {
     render(): import("lit-html").TemplateResult<1>;
     private _renderInbox;
     private _renderRules;
+    private _onDragStart;
+    private _onDragOver;
+    private _onDragLeave;
+    private _onDrop;
+    private _onDragEnd;
     private _renderGroups;
 }
 declare global {
