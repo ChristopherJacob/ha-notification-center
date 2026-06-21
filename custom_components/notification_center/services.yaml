@@ -1,0 +1,30 @@
+send:
+  name: Send notification
+  description: >-
+    Send a notification through the Notification Center routing engine.
+    Rules are evaluated in order — the first matching rule determines
+    which group receives the notification.
+  fields:
+    message:
+      name: Message
+      description: Notification body text.
+      required: true
+      example: "The garage door has been open for 30 minutes."
+      selector:
+        text:
+          multiline: true
+    title:
+      name: Title
+      description: Optional notification title.
+      example: "Garage Alert"
+      selector:
+        text: {}
+    data:
+      name: Data
+      description: >-
+        Additional data. Include "priority" (low/normal/high/urgent),
+        notification tag, and any other platform-specific options.
+      advanced: true
+      example: '{"priority": "high", "tag": "garage"}'
+      selector:
+        object: {}
