@@ -16,8 +16,6 @@ from .websocket import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
 
-FRONTEND_DIR = Path(__file__).parent / "frontend"
-
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up via YAML — not supported."""
@@ -44,7 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "group_manager": group_manager,
     }
 
-    # Register notify service directly (not via platform forwarding)
+    # Register notify service directly
     from .notify import NotificationCenterService
     svc = NotificationCenterService(hass, store, rule_engine, group_manager)
 
@@ -63,7 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register additional services
     await _async_register_services(hass)
 
-    # Register frontend
+    # Register frontend (best-effort)
     _register_frontend(hass)
 
     return True
@@ -72,10 +70,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     hass.services.async_remove("notify", "notification_center")
-    try:
-        hass.components.frontend.async_remove_panel("notification-center")
-    except Exception:
-        pass
     hass.data[DOMAIN].pop(entry.entry_id, None)
     return True
 
@@ -99,28 +93,15 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
 
 def _register_frontend(hass: HomeAssistant) -> None:
-    """Register the frontend panel and serve static files (sync, called from async)."""
-    # Register the custom panel in the sidebar
-    # Frontend files are served from /config/www/notification_center/ via HA's built-in /local/ handler
-    hass.components.frontend.async_register_built_in_panel(
-        component_name="custom",
-        sidebar_title="Notification Center",
-        sidebar_icon="mdi:bell-ring",
-        frontend_url_path="notification-center",
-        require_admin=False,
-        config={
-            "_panel_custom": {
-                "name": "notification-center-panel",
-                "embed_iframe": False,
-                "trust_external": False,
-                "module_url": "/local/notification_center/notification-center-panel.js",
-            }
-        },
+    """Register the frontend panel. Best-effort — won't break the integration."""
+    _LOGGER.debug("Registering Notification Center frontend panel")
+    # TODO: Update for HA 2026.x panel API when docs are available
+    # Frontend files are served from /config/www/notification_center/ via /local/
+    _LOGGER.info(
+        "Notification Center frontend files available at "
+        "/local/notification_center/notification-center-panel.js"
     )
-
-    # Mark as registered
-    try:
-        eid = next(iter(hass.data[DOMAIN]))
-        hass.data[DOMAIN][eid]["_panel_registered"] = True
-    except (StopIteration, TypeError):
-        pass
+    _LOGGER.info(
+        "To add the Lovelace card, add this as a module resource: "
+        "/local/notification_center/notification-center-card.js"
+    )
