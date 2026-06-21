@@ -143,6 +143,19 @@ class RuleEngine:
             before_str = condition.get("before")
             current_time = now.time()
 
+            if after_str and before_str:
+                h_a, m_a = map(int, after_str.split(":"))
+                h_b, m_b = map(int, before_str.split(":"))
+                after_t = time(h_a, m_a)
+                before_t = time(h_b, m_b)
+
+                if after_t < before_t:
+                    # Same-day range: e.g., 09:00–17:00
+                    return after_t <= current_time <= before_t
+                else:
+                    # Overnight range: e.g., 22:00–07:00
+                    return current_time >= after_t or current_time <= before_t
+
             if after_str:
                 h, m = map(int, after_str.split(":"))
                 if current_time < time(h, m):
