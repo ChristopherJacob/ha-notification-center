@@ -6,7 +6,7 @@ import type { NotificationRule, RuleCondition, NotificationGroup } from "../data
 export class RuleEditorDialog extends LitElement {
   @property({ type: Object }) rule: NotificationRule | null = null;
   @property({ type: Array }) groups: NotificationGroup[] = [];
-  @property({ type: Boolean }) open = false;
+  @property({ type: Boolean, reflect: true }) open = false;
 
   @state() private _name = "";
   @state() private _description = "";

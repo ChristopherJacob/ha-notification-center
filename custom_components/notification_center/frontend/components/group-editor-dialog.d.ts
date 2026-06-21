@@ -7,8 +7,15 @@ export declare class GroupEditorDialog extends LitElement {
     private _description;
     private _icon;
     private _targets;
+    private _availableServices;
+    private _selectedServices;
+    private _useChecklist;
     static styles: import("lit").CSSResult;
     updated(changed: Map<string, any>): void;
+    private _loadServices;
+    private _toggleService;
+    private _selectAll;
+    private _clearAll;
     private _save;
     private _delete;
     close(): void;

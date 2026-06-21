@@ -680,7 +680,7 @@ __decorate([
     n({ type: Array })
 ], RuleEditorDialog.prototype, "groups", void 0);
 __decorate([
-    n({ type: Boolean })
+    n({ type: Boolean, reflect: true })
 ], RuleEditorDialog.prototype, "open", void 0);
 __decorate([
     r()
@@ -713,20 +713,78 @@ let GroupEditorDialog = class GroupEditorDialog extends i {
         this._description = "";
         this._icon = "mdi:bell-ring";
         this._targets = "";
+        this._availableServices = [];
+        this._selectedServices = new Set();
+        this._useChecklist = true;
     }
     updated(changed) {
-        if (changed.has("open") && this.open && this.group) {
-            this._name = this.group.name;
-            this._description = this.group.description || "";
-            this._icon = this.group.icon || "mdi:bell-ring";
-            this._targets = (this.group.targets || []).join("\n");
+        if (changed.has("open") && this.open) {
+            if (this.group) {
+                this._name = this.group.name;
+                this._description = this.group.description || "";
+                this._icon = this.group.icon || "mdi:bell-ring";
+                this._targets = (this.group.targets || []).join("\n");
+                this._selectedServices = new Set(this.group.targets || []);
+            }
+            else {
+                this._name = "";
+                this._description = "";
+                this._icon = "mdi:bell-ring";
+                this._targets = "";
+                this._selectedServices = new Set();
+            }
+            this._loadServices();
         }
     }
+    _loadServices() {
+        try {
+            const haApp = document.querySelector("home-assistant");
+            const haMain = document.querySelector("home-assistant-main");
+            const hass = haApp?.hass || haMain?.hass;
+            if (!hass?.services)
+                return;
+            const notifyServices = hass.services.notify || {};
+            // Filter to mobile_app services only
+            const services = [];
+            for (const name of Object.keys(notifyServices)) {
+                if (name.startsWith("mobile_app_")) {
+                    services.push(`notify.${name}`);
+                }
+            }
+            this._availableServices = services;
+        }
+        catch {
+            // Silently fail — user can still type manually
+        }
+    }
+    _toggleService(service) {
+        const next = new Set(this._selectedServices);
+        if (next.has(service)) {
+            next.delete(service);
+        }
+        else {
+            next.add(service);
+        }
+        this._selectedServices = next;
+        // Sync to textarea
+        this._targets = [...next].join("\n");
+    }
+    _selectAll() {
+        const all = new Set(this._availableServices);
+        this._selectedServices = all;
+        this._targets = [...all].join("\n");
+    }
+    _clearAll() {
+        this._selectedServices = new Set();
+        this._targets = "";
+    }
     _save() {
-        const targets = this._targets
-            .split("\n")
-            .map((t) => t.trim())
-            .filter((t) => t.length > 0);
+        const targets = this._useChecklist
+            ? [...this._selectedServices]
+            : this._targets
+                .split("\n")
+                .map((t) => t.trim())
+                .filter((t) => t.length > 0);
         const group = {
             id: this.group?.id || `group_${Date.now()}`,
             name: this._name || "Untitled Group",
@@ -805,17 +863,71 @@ let GroupEditorDialog = class GroupEditorDialog extends i {
           </div>
         </div>
         <div class="field">
-          <label>Targets (one per line)</label>
-          <textarea
-            .value=${this._targets}
-            @input=${(e) => (this._targets = e.target.value)}
-            placeholder="notify.mobile_app_iphone&#10;notify.mobile_app_pixel"
-            rows="4"
-          ></textarea>
-          <div class="hint">
-            Leave empty to target all mobile devices. Format:
-            notify.mobile_app_name
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label>Targets</label>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-select-all" @click=${this._selectAll}>All</button>
+              <button class="btn-select-all" @click=${this._clearAll}>Clear</button>
+            </div>
           </div>
+
+          <!-- Mode toggle -->
+          <div class="mode-toggle">
+            <button
+              class=${this._useChecklist ? "active" : ""}
+              @click=${() => (this._useChecklist = true)}
+            >
+              Checklist
+            </button>
+            <button
+              class=${!this._useChecklist ? "active" : ""}
+              @click=${() => (this._useChecklist = false)}
+            >
+              Manual
+            </button>
+          </div>
+
+          ${this._useChecklist
+            ? b `
+                <div class="checklist">
+                  ${this._availableServices.length === 0
+                ? b `<div class="empty-services">Loading services…</div>`
+                : this._availableServices.map((svc) => b `
+                          <div
+                            class="checklist-item"
+                            @click=${() => this._toggleService(svc)}
+                          >
+                            <input
+                              type="checkbox"
+                              .checked=${this._selectedServices.has(svc)}
+                              @click=${(e) => e.stopPropagation()}
+                              @change=${() => this._toggleService(svc)}
+                            />
+                            <span class="device-icon">
+                              ${svc.includes("ipad") ? "📱" : "📲"}
+                            </span>
+                            <span class="device-name">
+                              ${svc.replace("notify.mobile_app_", "").replace(/_/g, " ")}
+                            </span>
+                            <span class="device-id">${svc}</span>
+                          </div>
+                        `)}
+                </div>
+                <div class="hint" style="margin-top:4px;">
+                  ${this._selectedServices.size} device(s) selected
+                </div>
+              `
+            : b `
+                <textarea
+                  .value=${this._targets}
+                  @input=${(e) => (this._targets = e.target.value)}
+                  placeholder="notify.mobile_app_iphone&#10;notify.mobile_app_pixel"
+                  rows="4"
+                ></textarea>
+                <div class="hint">
+                  One per line. Leave empty for all devices.
+                </div>
+              `}
         </div>
         <div class="actions">
           ${this.group?.id && this.group.id !== "all_devices"
@@ -853,7 +965,7 @@ GroupEditorDialog.styles = i$3 `
       border-radius: 16px;
       padding: 24px;
       width: 90%;
-      max-width: 500px;
+      max-width: 540px;
       max-height: 85vh;
       overflow-y: auto;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -901,6 +1013,75 @@ GroupEditorDialog.styles = i$3 `
       gap: 8px;
       font-size: 13px;
     }
+
+    /* Checklist styles */
+    .checklist {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .checklist-item:hover {
+      background: var(--secondary-background-color, #f5f5f5);
+    }
+    .checklist-item input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+    }
+    .checklist-item .device-icon {
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .checklist-item .device-name {
+      flex: 1;
+    }
+    .checklist-item .device-id {
+      font-size: 11px;
+      color: var(--secondary-text-color, #757575);
+    }
+    .empty-services {
+      text-align: center;
+      padding: 16px;
+      color: var(--secondary-text-color);
+      font-size: 13px;
+    }
+    .mode-toggle {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+      background: var(--secondary-background-color, #f5f5f5);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .mode-toggle button {
+      flex: 1;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      background: transparent;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--secondary-text-color);
+    }
+    .mode-toggle button.active {
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
     .actions {
       display: flex;
       gap: 8px;
@@ -934,12 +1115,21 @@ GroupEditorDialog.styles = i$3 `
       color: #c62828;
       margin-right: auto;
     }
+    .btn-select-all {
+      background: none;
+      border: none;
+      color: var(--primary-color, #03a9f4);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-weight: 400;
+    }
   `;
 __decorate([
     n({ type: Object })
 ], GroupEditorDialog.prototype, "group", void 0);
 __decorate([
-    n({ type: Boolean })
+    n({ type: Boolean, reflect: true })
 ], GroupEditorDialog.prototype, "open", void 0);
 __decorate([
     r()
@@ -953,6 +1143,15 @@ __decorate([
 __decorate([
     r()
 ], GroupEditorDialog.prototype, "_targets", void 0);
+__decorate([
+    r()
+], GroupEditorDialog.prototype, "_availableServices", void 0);
+__decorate([
+    r()
+], GroupEditorDialog.prototype, "_selectedServices", void 0);
+__decorate([
+    r()
+], GroupEditorDialog.prototype, "_useChecklist", void 0);
 GroupEditorDialog = __decorate([
     t("group-editor-dialog")
 ], GroupEditorDialog);
