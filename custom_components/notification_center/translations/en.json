@@ -1,0 +1,29 @@
+{
+  "title": "Notification Center",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Setup Notification Center",
+        "description": "Configure your notification routing hub.",
+        "data": {
+          "name": "Integration name",
+          "max_history": "Max history entries"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Notification Center instance is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notification Center Options",
+        "description": "Configure notification center settings.",
+        "data": {
+          "max_history": "Max history entries"
+        }
+      }
+    }
+  }
+}
