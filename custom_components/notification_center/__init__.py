@@ -5,6 +5,7 @@ from pathlib import Path
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.frontend import async_register_built_in_panel
 
 from .const import (
     DOMAIN, CONF_GROUPS, CONF_RULES, CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY,
@@ -61,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register additional services
     await _async_register_services(hass)
 
-    # Register frontend (best-effort)
+    # Register frontend panel
     _register_frontend(hass)
 
     return True
@@ -70,6 +71,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     hass.services.async_remove("notify", "notification_center")
+    try:
+        hass.components.frontend.async_remove_panel("notification-center")
+    except Exception:
+        pass
     hass.data[DOMAIN].pop(entry.entry_id, None)
     return True
 
@@ -93,15 +98,22 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
 
 def _register_frontend(hass: HomeAssistant) -> None:
-    """Register the frontend panel. Best-effort — won't break the integration."""
-    _LOGGER.debug("Registering Notification Center frontend panel")
-    # TODO: Update for HA 2026.x panel API when docs are available
-    # Frontend files are served from /config/www/notification_center/ via /local/
-    _LOGGER.info(
-        "Notification Center frontend files available at "
-        "/local/notification_center/notification-center-panel.js"
+    """Register the custom panel in the sidebar (sync wrapper)."""
+    # Frontend JS files are served from /config/www/notification_center/ via HA's /local/
+    async_register_built_in_panel(
+        hass,
+        component_name="custom",
+        sidebar_title="Notification Center",
+        sidebar_icon="mdi:bell-ring",
+        frontend_url_path="notification-center",
+        require_admin=False,
+        config={
+            "_panel_custom": {
+                "name": "notification-center-panel",
+                "embed_iframe": False,
+                "trust_external": False,
+                "js_url": "/local/notification_center/notification-center-panel.js",
+            }
+        },
     )
-    _LOGGER.info(
-        "To add the Lovelace card, add this as a module resource: "
-        "/local/notification_center/notification-center-card.js"
-    )
+    _LOGGER.info("Notification Center panel registered in sidebar")
