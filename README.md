@@ -3,7 +3,7 @@
 **A beautiful, intelligent notification routing hub for Home Assistant.**
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
-[![License](https://img.shields.io/github/license/cjacob/ha-notification-center?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/github/license/ChristopherJacob/ha-notification-center?style=for-the-badge)](LICENSE)
 
 ---
 
@@ -23,17 +23,17 @@
 
 ### Option 1: HACS (Recommended)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cjacob&repository=ha-notification-center&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ChristopherJacob&repository=ha-notification-center&category=integration)
 
 1. Click the badge above, or in HACS go to **Integrations** → **⋮** → **Custom repositories**
-2. Add `https://github.com/cjacob/ha-notification-center` as type **Integration**
+2. Add `https://github.com/ChristopherJacob/ha-notification-center` as type **Integration**
 3. Click **Install** → **Restart Home Assistant**
 
 ### Option 2: Manual Install
 
 ```bash
 cd /config/custom_components
-git clone https://github.com/cjacob/ha-notification-center.git
+git clone https://github.com/ChristopherJacob/ha-notification-center.git
 mv ha-notification-center/custom_components/notification_center .
 rm -rf ha-notification-center
 
@@ -135,7 +135,7 @@ Automations → notify.notification_center (proxy) → Rule Engine → Groups �
 ## 🔧 Development
 
 ```bash
-git clone https://github.com/cjacob/ha-notification-center.git
+git clone https://github.com/ChristopherJacob/ha-notification-center.git
 cd ha-notification-center/frontend
 npm install
 npm run build        # also copies to custom_components/
@@ -151,4 +151,4 @@ ssh user@ha "sudo cp -r /config/custom_components/notification_center/frontend/*
 
 ## 📄 License
 
-MIT © [cjacob](https://github.com/cjacob)
+MIT © [ChristopherJacob](https://github.com/ChristopherJacob)
