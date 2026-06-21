@@ -19,27 +19,6 @@ from .groups import GroupManager
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_get_service(
-    hass: HomeAssistant,
-    config: dict[str, Any],
-    discovery_info: dict[str, Any] | None = None,
-) -> "NotificationCenterService":
-    """Get the notification service."""
-    # Get the first (and only) config entry
-    entry = next(iter(hass.config_entries.async_entries(DOMAIN)), None)
-    if not entry:
-        raise ValueError("Notification Center not configured")
-
-    store = hass.data[DOMAIN][entry.entry_id].get("store")
-    rule_engine = hass.data[DOMAIN][entry.entry_id].get("rule_engine")
-    group_manager = hass.data[DOMAIN][entry.entry_id].get("group_manager")
-
-    if not all([store, rule_engine, group_manager]):
-        raise ValueError("Notification Center not fully initialized")
-
-    return NotificationCenterService(hass, store, rule_engine, group_manager)
-
-
 class NotificationCenterService(BaseNotificationService):
     """Notification Center — routes messages based on rules."""
 
@@ -77,7 +56,7 @@ class NotificationCenterService(BaseNotificationService):
         final_priority = result["priority"]
 
         # Log to history
-        await self.store.async_add(
+        notif_id = await self.store.async_add(
             {
                 "title": title,
                 "message": message,
@@ -128,25 +107,24 @@ class NotificationCenterService(BaseNotificationService):
                     "Failed to deliver notification to %s: %s", target, err
                 )
 
-        # Update history entry with delivery status
+        # Errors are logged but not added as separate history entries
         if delivery_errors:
-            await self.store.async_add(
-                {
-                    "title": f"Delivery error for: {title or message[:50]}",
-                    "message": "; ".join(delivery_errors),
-                    "priority": "low",
-                    "matched_rule": "_delivery_error",
-                    "target_group": target_group_id,
-                    "delivered": False,
-                }
+            _LOGGER.warning(
+                "Delivery issues for notification '%s': %s",
+                title or message[:50],
+                "; ".join(delivery_errors),
             )
 
     def _get_all_notify_services(self) -> list[str]:
-        """Get all available notify.* services."""
+        """Get all available notify.* services except generic/reserved ones."""
         targets = []
+        # Only target mobile_app services for "all devices" delivery
         notify_services = self.hass.services.async_services().get("notify", {})
         for service_name in notify_services:
             if service_name == DOMAIN:
-                continue  # Skip ourselves to avoid recursion
+                continue
+            # Only mobile_app services are real notification targets
+            if not service_name.startswith("mobile_app_"):
+                continue
             targets.append(f"notify.{service_name}")
         return targets

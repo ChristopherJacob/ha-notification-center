@@ -8,7 +8,6 @@ from homeassistant.config_entries import ConfigEntry
 
 from .const import (
     DOMAIN,
-    PLATFORM,
     CONF_GROUPS,
     CONF_RULES,
     CONF_MAX_HISTORY,
@@ -53,11 +52,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "group_manager": group_manager,
     }
 
+    # Register notify service DIRECTLY (not via platform forwarding —
+    # async_forward_entry_setups doesn't work reliably for notify in HA 2026.x)
+    from .notify import NotificationCenterService
+
+    svc = NotificationCenterService(hass, store, rule_engine, group_manager)
+
+    async def _send_message(call: ServiceCall) -> None:
+        await svc.async_send_message(
+            call.data.get("message", ""),
+            title=call.data.get("title", ""),
+            data=call.data.get("data", {}),
+        )
+
+    hass.services.async_register("notify", "notification_center", _send_message)
+
     # Register WebSocket commands
     async_register_websocket_commands(hass)
-
-    # Forward to notify platform
-    await hass.config_entries.async_forward_entry_setups(entry, [PLATFORM])
 
     # Register additional services
     await _async_register_services(hass)
@@ -70,28 +81,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Remove notify service
+    hass.services.async_remove("notify", "notification_center")
+
     # Remove panel
-    if hass.data[DOMAIN].get("_panel_registered"):
+    if hass.data[DOMAIN].get(entry.entry_id, {}).get("_panel_registered"):
         hass.components.frontend.async_remove_panel("notification-center")
 
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, [PLATFORM])
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-    return unload_ok
+    hass.data[DOMAIN].pop(entry.entry_id, None)
+    return True
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
     """Register additional services for the integration."""
 
     async def handle_dismiss(call: ServiceCall) -> None:
-        """Dismiss a notification by ID."""
         notification_id = call.data.get("notification_id", "")
         for entry_data in hass.data[DOMAIN].values():
             if isinstance(entry_data, dict) and "store" in entry_data:
                 await entry_data["store"].async_dismiss(notification_id)
 
     async def handle_clear_history(call: ServiceCall) -> None:
-        """Clear all notification history."""
         for entry_data in hass.data[DOMAIN].values():
             if isinstance(entry_data, dict) and "store" in entry_data:
                 await entry_data["store"].async_clear_all()
@@ -103,14 +113,12 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register the frontend panel and serve static files."""
     if FRONTEND_DIR.exists():
-        # Serve frontend files
         hass.http.register_static_path(
             "/notification_center_static",
             str(FRONTEND_DIR),
             cache_headers=not hass.config.debug,
         )
 
-        # Register the custom panel
         hass.components.frontend.async_register_built_in_panel(
             component_name="custom",
             sidebar_title="Notification Center",
@@ -126,8 +134,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
                 }
             },
         )
-        hass.data[DOMAIN]["_panel_registered"] = True
 
-    # Also register the Lovelace card resource
-    # This will be handled by the user adding it as a resource, but
-    # we can hint at the URL: /notification_center_static/notification-center-card.js
+        entry_id = next(iter(hass.data[DOMAIN]))
+        hass.data[DOMAIN][entry_id]["_panel_registered"] = True
